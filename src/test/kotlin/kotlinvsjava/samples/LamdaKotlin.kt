@@ -5,30 +5,37 @@ import org.junit.jupiter.api.Test
 
 //Lambda expressions and inline functions
 class LambdaKotlin {
-    @Test
-    fun testFilter() {
-        val list = listOf("Tom", "Bob")
-        val filteredList = list.filterCaseInsensitive { it.contains("bo") }
-        // map is an inline function
-        val names = filteredList.map { Name(it) }
-        assertThat(names).containsExactly(Name("Bob"))
+
+    private val chunkSize = 15
+    private val repository = FileRepositoryImpl()
+
+    fun getFileNamesAndUrlsByIds(ids: List<FileReference>): List<String> {
+        return ids.asSequence()
+            .map { it.entityId }
+            .chunked(chunkSize) { chunkedIds -> repository.findAllById(chunkedIds) }
+            .flatten()
+            .sortedWith(compareBy<File> { it.url.isNullOrBlank() }.thenBy { it.sortOrder })
+            .mapNotNull { it.fileName ?: it.url }.toList()
     }
-
-    // extension function
-    private fun List<String>.filterCaseInsensitive(predicate: (String) -> Boolean): List<String> {
-        return this.filter { predicate(it.lowercase()) }
-    }
-
-    // data class
-    data class Name(val name: String)
-
 
     @Test
-    fun testCopy(){
-        val person = PersonDto("Max", 18)
-        val copied = person.copy(age = 20)
-        assertThat(copied).isEqualTo(PersonDto("Max",20))
+    fun testCopy() {
+        val file = File(1L, "profile.png", "http://image.at/profile.png", 1)
+        val copied = file.copy(fileName = "newProfile.png")
+        assertThat(copied.fileName).isEqualTo("newProfile.png")
     }
-    data class PersonDto(val name: String, val age: Int)
 }
 
+// data classes
+data class FileReference(val entityId: Long)
+data class File(val id: Long, val fileName: String?, val url: String?, val sortOrder: Int)
+
+interface FileRepository {
+    fun findAllById(ids: List<Long>): List<File>
+}
+
+class FileRepositoryImpl : FileRepository {
+    override fun findAllById(ids: List<Long>): List<File> {
+        return emptyList()
+    }
+}
